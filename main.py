@@ -9,6 +9,12 @@ load_dotenv()
 OPENAI_MODEL = "gpt-4o"
 ANTHROPIC_MODEL = "claude-3-5-sonnet-20240620"
 
+system_message = """
+You are a helpful assistant that implements Python code in high performance C++ for a M4 Mac.
+Respond only with the C++ code; use comments sparingly and do not provide any explanations other than occasional comments.
+The C++ response needs to produce an identical output in the fastest possible time.
+"""
+
 def initialize_clients():
     """Initialize OpenAI and Anthropic clients using API keys from environment variables."""
     try:
@@ -33,6 +39,9 @@ def initialize_clients():
     except Exception as e:
         print(f"Error initializing clients: {e}")
         raise
+    
+def user_prompt_for(python_code):
+    pass
 
 if __name__ == "__main__":
     openai_client, anthropic_client = initialize_clients()
