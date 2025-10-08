@@ -225,3 +225,5 @@ $RECYCLE.BIN/
 # logs/
 # temp/
 # data/
+
+*.cpp
