@@ -5,6 +5,7 @@ A command-line tool that converts Python code to high-performance C++ using AI m
 ## Features
 
 - **Dual AI Support**: Choose between GPT-4 or Claude, or use both for comparison
+- **Two Interfaces**: Command-line interface and web-based Gradio UI
 - **Optimized for M4 Mac**: Generated C++ code is optimized for Apple Silicon architecture
 - **Multiple Input Methods**: Convert from Python files or direct code strings
 - **Automatic Output Management**: Generated C++ files are organized in an `output/` directory
@@ -29,7 +30,13 @@ cd py2cpp-llm
 2. Install dependencies:
 
 ```bash
-pip install openai anthropic python-dotenv
+pip install -r requirements.txt
+```
+
+Or install manually:
+
+```bash
+pip install openai anthropic python-dotenv gradio
 ```
 
 3. Set up environment variables in `.env` file:
@@ -41,7 +48,23 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
 ## Usage
 
-### Basic Usage
+### Web Interface (Recommended)
+
+Launch the Gradio web interface for an interactive experience:
+
+```bash
+python main_gradio.py
+```
+
+This will open a web interface in your browser where you can:
+
+- Paste Python code directly
+- Choose between GPT-4 or Claude
+- See the generated C++ code instantly
+- Access compilation instructions
+- Try example code snippets
+
+### Command Line Interface
 
 Convert a Python file using GPT-4:
 
@@ -120,7 +143,9 @@ clang++ -O3 -std=c++17 -march=armv8.3-a -o optimized_claude output/optimized_cla
 
 ```
 py2cpp-llm/
-├── main.py              # Main application
+├── main.py              # Command line interface
+├── main_gradio.py       # Web interface (Gradio UI)
+├── requirements.txt     # Python dependencies
 ├── .env                 # Environment variables (API keys)
 ├── .gitignore          # Git ignore rules
 ├── README.md           # This file

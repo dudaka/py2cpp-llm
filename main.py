@@ -109,6 +109,19 @@ def optimize_claude(python_code, max_tokens=2000):
     filepath = write_output(reply, "claude")
     return filepath
 
+
+def optimize(python_code, model="gpt", max_tokens=2000):
+    if model == "gpt":
+        result = optimize_gpt(python_code)
+    elif model == "claude":
+        result = optimize_claude(python_code, max_tokens)
+    else:
+        raise ValueError("Model must be 'gpt' or 'claude'")
+    for stream_so_far in result:
+        yield stream_so_far
+
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Convert Python code to optimized C++ using AI models",
