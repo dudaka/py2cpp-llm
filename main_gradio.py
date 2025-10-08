@@ -1,4 +1,7 @@
 import os
+import sys
+import io
+import subprocess
 
 try:
     import gradio as gr
@@ -9,7 +12,38 @@ except ImportError:
     exit(1)
 
 # Import functions from main.py to avoid code duplication
-from main import optimize
+from main import optimize, write_output
+
+def execute_python(code):
+    try:
+        output = io.StringIO()
+        sys.stdout = output
+        
+        # Create a proper execution namespace that includes built-ins
+        namespace = {'__builtins__': __builtins__}
+        
+        # Execute the code in the namespace
+        exec(code, namespace)
+        
+    except Exception as e:
+        return f"Error executing Python code: {str(e)}"
+    finally:
+        sys.stdout = sys.__stdout__
+    return output.getvalue()
+
+
+def execute_cpp(code, model_name):
+        write_output(code, model_name)
+        try:
+            program_file = os.path.join("output", f"optimized_{model_name.lower()}.cpp")
+            compile_cmd = ["clang++", "-Ofast", "-std=c++17", "-march=armv8.5-a",
+                           "-mtune=apple-m1", "-mcpu=apple-m1", "-o", "optimized", program_file]
+            compile_result = subprocess.run(compile_cmd, check=True, text=True, capture_output=True)
+            run_cmd = ["./optimized"]
+            run_result = subprocess.run(run_cmd, check=True, text=True, capture_output=True)
+            return run_result.stdout
+        except subprocess.CalledProcessError as e:
+            return f"An error occurred:\n{e.stderr}"
 
 def optimize_for_gradio_streaming(python_code, model_name):
     """Streaming version for real-time UI updates"""
@@ -66,6 +100,8 @@ for i in range(10):
     
     return programs
 
+
+
 def create_gradio_ui():
     """Create and return the Gradio interface"""
     
@@ -76,35 +112,46 @@ def create_gradio_ui():
     python_sample = list(programs.values())[0] if programs else ""
     
     with gr.Blocks(title="Python to C++ Converter", theme=gr.themes.Soft()) as ui:
-        gr.Markdown("# 🚀 Python to C++ Converter")
-        gr.Markdown("Convert Python code to optimized C++ using AI models (GPT-4 or Claude)")
+        gr.Markdown("## 🚀 Convert code from Python to C++")
         
         with gr.Row():
-            with gr.Column():
-                python = gr.Textbox(
-                    label="📝 Python Code", 
-                    lines=20, 
-                    value=python_sample,
-                    placeholder="Enter your Python code here...",
-                    info="Paste or type your Python code that you want to convert to C++"
-                )
-                
-                with gr.Row():
-                    model = gr.Dropdown(
-                        ["GPT", "Claude"], 
-                        label="🤖 Select AI Model", 
-                        value="GPT",
-                        info="Choose which AI model to use for conversion"
-                    )
-                    convert = gr.Button("🔄 Convert to C++", variant="primary", size="lg")
-            
-            with gr.Column():
-                cpp = gr.Textbox(
-                    label="⚡ Generated C++ Code", 
-                    lines=20,
-                    placeholder="Generated C++ code will appear here...",
-                    info="Optimized C++ code will be generated here"
-                )
+            python = gr.Textbox(
+                label="Python code:", 
+                value=python_sample, 
+                lines=10,
+                placeholder="Enter your Python code here..."
+            )
+            cpp = gr.Textbox(
+                label="C++ code:", 
+                lines=10,
+                placeholder="Generated C++ code will appear here..."
+            )
+        
+        with gr.Row():
+            model = gr.Dropdown(
+                ["GPT", "Claude"], 
+                label="Select model", 
+                value="GPT"
+            )
+        
+        with gr.Row():
+            convert = gr.Button("Convert code", variant="primary")
+        
+        with gr.Row():
+            python_run = gr.Button("🐍 Run Python", variant="secondary")
+            cpp_run = gr.Button("⚡ Run C++", variant="secondary")
+        
+        with gr.Row():
+            python_out = gr.TextArea(
+                label="Python result:", 
+                lines=8,
+                placeholder="Python execution output will appear here..."
+            )
+            cpp_out = gr.TextArea(
+                label="C++ result:", 
+                lines=8,
+                placeholder="C++ execution output will appear here..."
+            )
         
         with gr.Accordion("📋 Compilation Instructions", open=False):
             gr.Markdown("""
@@ -134,6 +181,8 @@ def create_gradio_ui():
             outputs=[cpp],
             api_name="convert"
         )
+        python_run.click(execute_python, inputs=[python], outputs=[python_out])
+        cpp_run.click(execute_cpp, inputs=[cpp, model], outputs=[cpp_out])
         
         # Add example programs from the programs directory
         with gr.Accordion("💡 Example Python Programs", open=False):
