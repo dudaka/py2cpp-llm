@@ -39,9 +39,60 @@ def initialize_clients():
     except Exception as e:
         print(f"Error initializing clients: {e}")
         raise
+
+openai, claude = initialize_clients()
     
 def user_prompt_for(python_code):
-    pass
+    user_prompt = f"""
+    Rewrite this Python code in C++ with the fastest possible implementation that produces identical output in the least time.
+    Respond only with the C++ code; do not explain your work other than a few comments.
+    Pay attention to number types to ensure no int overflows. Remember to #include all necessary C++ packages such as iomanip.
+
+
+    {python_code}
+    """
+    return user_prompt
+
+def message_for(python_code):
+    return [
+        {"role": "system", "content": system_message},
+        {"role": "user", "content": user_prompt_for(python_code)}
+    ]
+
+def write_output(cpp_code):
+    code = cpp_code.replace("```cpp", "").replace("```", "").strip()
+    with open('optimized.cpp', 'w') as f:
+        f.write(code)
+
+def optimize_gpt(python_code):
+    stream = openai.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=message_for(python_code),
+        temperature=0,
+        stream=True
+    )
+    reply = ""
+    for chunk in stream:
+        fragment = chunk.choices[0].delta.get("content", "")
+        reply += fragment
+        print(fragment, end="", flush=True)
+    write_output(reply)
+
+def optimize_claude(python_code):
+    result = claude.messages.create(
+        model=ANTHROPIC_MODEL,
+        max_tokens=2000,
+        system=system_message,
+        messages=[
+            {"role": "user", "content": user_prompt_for(python_code)}
+        ]
+    )
+    reply = ''
+    with result as stream:
+        for text in stream:
+            reply += text
+            print(text, end="", flush=True)
+    write_output(reply)
 
 if __name__ == "__main__":
-    openai_client, anthropic_client = initialize_clients()
+    pass
