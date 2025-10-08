@@ -1,8 +1,4 @@
 import os
-from dotenv import load_dotenv
-
-from openai import OpenAI 
-from anthropic import Anthropic
 
 try:
     import gradio as gr
@@ -12,100 +8,25 @@ except ImportError:
     print("Error: Gradio is not installed. Install it with: pip install gradio")
     exit(1)
 
-load_dotenv()
+# Import functions from main.py to avoid code duplication
+from main import optimize
 
-OPENAI_MODEL = "gpt-4.1"
-ANTHROPIC_MODEL = "claude-sonnet-4-5-20250929"
-
-system_message = """
-You are a helpful assistant that implements Python code in high performance C++ for a M4 Mac.
-Respond only with the C++ code; use comments sparingly and do not provide any explanations other than occasional comments.
-The C++ response needs to produce an identical output in the fastest possible time.
-"""
-
-def initialize_clients():
-    """Initialize OpenAI and Anthropic clients using API keys from environment variables."""
-    try:
-        openai_api_key = os.getenv("OPENAI_API_KEY")
-        anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
-        
-        # Check if API keys are available
-        if not openai_api_key:
-            raise ValueError("OPENAI_API_KEY not found in environment variables")
-        if not anthropic_api_key:
-            raise ValueError("ANTHROPIC_API_KEY not found in environment variables")
-
-        openai_client = OpenAI(api_key=openai_api_key)
-        anthropic_client = Anthropic(api_key=anthropic_api_key)
-        
-        print("OpenAI and Anthropic clients initialized successfully.")
-        return openai_client, anthropic_client
-        
-    except ValueError as ve:
-        print(f"Configuration error: {ve}")
-        raise
-    except Exception as e:
-        print(f"Error initializing clients: {e}")
-        raise
-
-# Initialize clients
-openai_client, claude_client = initialize_clients()
-
-def user_prompt_for(python_code):
-    user_prompt = f"""
-    Rewrite this Python code in C++ with the fastest possible implementation that produces identical output in the least time.
-    Respond only with the C++ code; do not explain your work other than a few comments.
-    Pay attention to number types to ensure no int overflows. Remember to #include all necessary C++ packages such as iomanip.
-
-    {python_code}
-    """
-    return user_prompt
-
-def message_for(python_code):
-    return [
-        {"role": "system", "content": system_message},
-        {"role": "user", "content": user_prompt_for(python_code)}
-    ]
-
-def optimize_for_gradio(python_code, model_name):
-    """Optimize function for Gradio UI - returns the complete C++ code"""
+def optimize_for_gradio_streaming(python_code, model_name):
+    """Streaming version for real-time UI updates"""
     try:
         if not python_code.strip():
-            return "Please enter some Python code to convert."
+            yield "Please enter some Python code to convert."
+            return
         
-        model = model_name.lower()
+        # Use the optimize function from main.py which now yields cleaned, progressive results
+        # Use the streaming optimize function for real-time results
+        result_generator = optimize(python_code, model=model_name, max_tokens=2000)
         
-        if model == "gpt":
-            # For GPT, we need to collect the streaming response
-            stream = openai_client.chat.completions.create(
-                model=OPENAI_MODEL,
-                messages=message_for(python_code),
-                stream=True
-            )
-            reply = ""
-            for chunk in stream:
-                if chunk.choices[0].delta.content is not None:
-                    reply += chunk.choices[0].delta.content
-            
-        elif model == "claude":
-            result = claude_client.messages.create(
-                model=ANTHROPIC_MODEL,
-                max_tokens=2000,
-                system=system_message,
-                messages=[
-                    {"role": "user", "content": user_prompt_for(python_code)}
-                ]
-            )
-            reply = result.content[0].text
-        else:
-            return "Error: Model must be 'GPT' or 'Claude'"
-        
-        # Clean the code response
-        cpp_code = reply.replace("```cpp", "").replace("```", "").strip()
-        return cpp_code
+        for chunk in result_generator:
+            yield chunk
         
     except Exception as e:
-        return f"Error during conversion: {str(e)}"
+        yield f"Error during conversion: {str(e)}"
 
 def load_program_files():
     """Load all Python programs from the programs directory"""
@@ -208,7 +129,7 @@ def create_gradio_ui():
             """)
 
         convert.click(
-            optimize_for_gradio, 
+            optimize, 
             inputs=[python, model], 
             outputs=[cpp],
             api_name="convert"

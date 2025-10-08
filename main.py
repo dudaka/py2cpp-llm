@@ -109,14 +109,44 @@ def optimize_claude(python_code, max_tokens=2000):
     filepath = write_output(reply, "claude")
     return filepath
 
+def stream_gpt(python_code):
+    stream = openai.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=message_for(python_code),
+        stream=True
+    )
+    reply = ""
+    for chunk in stream:
+        if chunk.choices[0].delta.content is not None:
+            fragment = chunk.choices[0].delta.content
+            reply += fragment
+            yield reply.replace("```cpp\n", "").replace("```", "").strip()
 
-def optimize(python_code, model="gpt", max_tokens=2000):
-    if model == "gpt":
-        result = optimize_gpt(python_code)
-    elif model == "claude":
-        result = optimize_claude(python_code, max_tokens)
+
+def stream_claude(python_code, max_tokens=2000):    
+    stream = claude.messages.create(
+        model=ANTHROPIC_MODEL,
+        max_tokens=max_tokens,
+        system=system_message,
+        messages=[
+            {"role": "user", "content": user_prompt_for(python_code)}
+        ],
+        stream=True
+    )
+    reply = ''
+    for event in stream:
+        if event.type == "content_block_delta":
+            text = event.delta.text
+            reply += text
+            yield reply.replace("```cpp\n", "").replace("```", "").strip()
+
+def optimize(python_code, model="GPT", max_tokens=2000):
+    if model == "GPT":
+        result = stream_gpt(python_code)
+    elif model == "Claude":
+        result = stream_claude(python_code, max_tokens)
     else:
-        raise ValueError("Model must be 'gpt' or 'claude'")
+        raise ValueError("Model must be 'GPT' or 'Claude'")
     for stream_so_far in result:
         yield stream_so_far
 
@@ -128,8 +158,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python main.py --file input.py --model gpt
-  python main.py --code "print('Hello')" --model claude
+  python main.py --file input.py --model GPT
+  python main.py --code "print('Hello')" --model Claude
   python main.py --file script.py --model both
         """
     )
@@ -150,9 +180,9 @@ Examples:
     # Model selection
     parser.add_argument(
         "--model", "-m",
-        choices=["gpt", "claude", "both"],
-        default="gpt",
-        help="AI model to use for conversion (default: gpt)"
+        choices=["GPT", "Claude", "both"],
+        default="GPT",
+        help="AI model to use for conversion (default: GPT)"
     )
     
     # Max tokens for Claude
@@ -196,12 +226,12 @@ Examples:
         print("-" * 50)
     
     try:
-        if args.model == "gpt":
+        if args.model == "GPT":
             if args.verbose:
                 print("Converting with GPT-4...")
             output_file = optimize_gpt(python_code)
             print(f"\nGenerated file: {output_file}")
-        elif args.model == "claude":
+        elif args.model == "Claude":
             if args.verbose:
                 print("Converting with Claude...")
             output_file = optimize_claude(python_code, args.max_tokens)
